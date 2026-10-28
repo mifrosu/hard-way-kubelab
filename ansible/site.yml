@@ -20,6 +20,7 @@
         cmd: virsh net-define /dev/stdin
         stdin: "{{ lookup('ansible.builtin.template', 'k8s-net.xml.j2') }}"
       when: net_info.rc != 0
+      changed_when: true
       register: net_defined
 
     - name: Refresh lab network state
@@ -30,7 +31,9 @@
     - name: Start lab network
       ansible.builtin.command: virsh net-start {{ lab_network.name }}
       when: net_info.stdout is not search('Active:\s+yes')
+      changed_when: true
 
     - name: Enable autostart on lab network
       ansible.builtin.command: virsh net-autostart {{ lab_network.name }}
       when: net_info.stdout is not search('Autostart:\s+yes')
+      changed_when: true

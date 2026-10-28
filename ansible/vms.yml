@@ -72,6 +72,7 @@
       vars:
         vm: "{{ result.vm }}"
       when: result.rc != 0
+      changed_when: true
 
     - name: Start VMs that are shut off
       ansible.builtin.command: virsh start {{ result.vm.name }}
@@ -80,3 +81,4 @@
         loop_var: result
         label: "{{ result.vm.name }}"
       when: result.rc == 0 and result.stdout is search('shut off')
+      changed_when: true

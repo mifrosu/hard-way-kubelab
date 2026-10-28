@@ -20,7 +20,9 @@
       when:
         - net_info.rc == 0
         - net_info.stdout is search('Active:\s+yes')
+      changed_when: true
 
     - name: Undefine lab network
       ansible.builtin.command: virsh net-undefine {{ lab_network.name }}
       when: net_info.rc == 0
+      changed_when: true

@@ -29,6 +29,7 @@
         loop_var: result
         label: "{{ result.vm.name }}"
       when: result.rc == 0 and result.stdout is search('running|paused')
+      changed_when: true
 
     - name: Undefine VMs and delete their disks
       ansible.builtin.command: virsh undefine {{ result.vm.name }} --remove-all-storage --nvram
@@ -37,6 +38,7 @@
         loop_var: result
         label: "{{ result.vm.name }}"
       when: result.rc == 0
+      changed_when: true
 
     - name: Remove cloud-init user-data
       ansible.builtin.file:
