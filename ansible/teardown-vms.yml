@@ -1,0 +1,48 @@
+---
+# Removes the lab VMs created by vms.yml: stops and undefines each VM and
+# deletes its disk and cloud-init user-data. The downloaded base image is kept.
+- name: Remove lab VMs
+  hosts: libvirt_hosts
+  become: true
+  environment:
+    LIBVIRT_DEFAULT_URI: qemu:///system
+  vars:
+    lab_cloud_init_dir: "{{ lab_image_dir }}/cloud-init"
+  tasks:
+    - name: Check for existing VMs
+      ansible.builtin.command: virsh domstate {{ vm.name }}
+      register: vm_state
+      changed_when: false
+      # Only "domain not found" is acceptable; other errors must fail
+      failed_when:
+        - vm_state.rc != 0
+        - "'Domain not found' not in vm_state.stderr"
+      loop: "{{ lab_vms }}"
+      loop_control:
+        loop_var: vm
+        label: "{{ vm.name }}"
+
+    - name: Stop running VMs
+      ansible.builtin.command: virsh destroy {{ result.vm.name }}
+      loop: "{{ vm_state.results }}"
+      loop_control:
+        loop_var: result
+        label: "{{ result.vm.name }}"
+      when: result.rc == 0 and result.stdout is search('running|paused')
+
+    - name: Undefine VMs and delete their disks
+      ansible.builtin.command: virsh undefine {{ result.vm.name }} --remove-all-storage --nvram
+      loop: "{{ vm_state.results }}"
+      loop_control:
+        loop_var: result
+        label: "{{ result.vm.name }}"
+      when: result.rc == 0
+
+    - name: Remove cloud-init user-data
+      ansible.builtin.file:
+        path: "{{ lab_cloud_init_dir }}/{{ vm.name }}-user-data"
+        state: absent
+      loop: "{{ lab_vms }}"
+      loop_control:
+        loop_var: vm
+        label: "{{ vm.name }}"
