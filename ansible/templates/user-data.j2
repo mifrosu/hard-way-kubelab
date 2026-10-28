@@ -1,0 +1,7 @@
+#cloud-config
+hostname: {{ vm.name }}
+manage_etc_hosts: true
+disable_root: false
+ssh_pwauth: false
+ssh_authorized_keys:
+  - {{ lookup('ansible.builtin.file', lab_ssh_public_key_file) | trim }}

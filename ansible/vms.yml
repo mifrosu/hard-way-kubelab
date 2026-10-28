@@ -1,0 +1,82 @@
+---
+# Creates the lab VMs with virt-install. Requires the lab network (site.yml)
+# and virt-install on the remote host.
+- name: Create lab VMs
+  hosts: libvirt_hosts
+  become: true
+  environment:
+    LIBVIRT_DEFAULT_URI: qemu:///system
+  vars:
+    lab_base_image: "{{ lab_image_dir }}/{{ lab_image_url | basename }}"
+    lab_cloud_init_dir: "{{ lab_image_dir }}/cloud-init"
+  tasks:
+    - name: Check that virt-install is available
+      ansible.builtin.command: virt-install --version
+      changed_when: false
+
+    - name: Create cloud-init directory
+      ansible.builtin.file:
+        path: "{{ lab_cloud_init_dir }}"
+        state: directory
+        mode: "0755"
+
+    # Never replaced once present: VM disks are overlays on this file
+    - name: Download base image
+      ansible.builtin.get_url:
+        url: "{{ lab_image_url }}"
+        dest: "{{ lab_base_image }}"
+        mode: "0644"
+        force: false
+
+    - name: Render cloud-init user-data
+      ansible.builtin.template:
+        src: user-data.j2
+        dest: "{{ lab_cloud_init_dir }}/{{ vm.name }}-user-data"
+        mode: "0644"
+      loop: "{{ lab_vms }}"
+      loop_control:
+        loop_var: vm
+        label: "{{ vm.name }}"
+
+    - name: Check for existing VMs
+      ansible.builtin.command: virsh domstate {{ vm.name }}
+      register: vm_state
+      changed_when: false
+      # Only "domain not found" is acceptable; other errors must fail
+      failed_when:
+        - vm_state.rc != 0
+        - "'Domain not found' not in vm_state.stderr"
+      loop: "{{ lab_vms }}"
+      loop_control:
+        loop_var: vm
+        label: "{{ vm.name }}"
+
+    - name: Create missing VMs
+      ansible.builtin.command:
+        argv:
+          - virt-install
+          - --name={{ vm.name }}
+          - --vcpus={{ vm.vcpus }}
+          - --memory={{ vm.memory_mb }}
+          - --os-variant={{ lab_os_variant }}
+          - --import
+          - --disk=path={{ lab_image_dir }}/{{ vm.name }}.qcow2,format=qcow2,size={{ vm.disk_gb }},backing_store={{ lab_base_image }}
+          - --network=network={{ lab_network.name }},mac={{ vm.mac }}
+          - --cloud-init=user-data={{ lab_cloud_init_dir }}/{{ vm.name }}-user-data
+          - --graphics=none
+          - --noautoconsole
+      loop: "{{ vm_state.results }}"
+      loop_control:
+        loop_var: result
+        label: "{{ result.vm.name }}"
+      vars:
+        vm: "{{ result.vm }}"
+      when: result.rc != 0
+
+    - name: Start VMs that are shut off
+      ansible.builtin.command: virsh start {{ result.vm.name }}
+      loop: "{{ vm_state.results }}"
+      loop_control:
+        loop_var: result
+        label: "{{ result.vm.name }}"
+      when: result.rc == 0 and result.stdout is search('shut off')
