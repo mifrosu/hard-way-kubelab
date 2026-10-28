@@ -10,7 +10,10 @@
       ansible.builtin.command: virsh net-info {{ lab_network.name }}
       register: net_info
       changed_when: false
-      failed_when: false
+      # Only "network not found" is acceptable; other errors (e.g. no libvirt socket) must fail
+      failed_when:
+        - net_info.rc != 0
+        - "'Network not found' not in net_info.stderr"
 
     - name: Stop lab network
       ansible.builtin.command: virsh net-destroy {{ lab_network.name }}
