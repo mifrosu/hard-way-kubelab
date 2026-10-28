@@ -1,0 +1,23 @@
+---
+# Removes the lab network created by site.yml.
+- name: Remove libvirt lab network
+  hosts: libvirt_hosts
+  become: true
+  environment:
+    LIBVIRT_DEFAULT_URI: qemu:///system
+  tasks:
+    - name: Check for existing lab network
+      ansible.builtin.command: virsh net-info {{ lab_network.name }}
+      register: net_info
+      changed_when: false
+      failed_when: false
+
+    - name: Stop lab network
+      ansible.builtin.command: virsh net-destroy {{ lab_network.name }}
+      when:
+        - net_info.rc == 0
+        - net_info.stdout is search('Active:\s+yes')
+
+    - name: Undefine lab network
+      ansible.builtin.command: virsh net-undefine {{ lab_network.name }}
+      when: net_info.rc == 0
