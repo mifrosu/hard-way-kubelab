@@ -18,6 +18,10 @@ A NAT network (`k8s`, `10.100.0.0/24`) with three Debian VMs:
 
 - [`ansible/`](ansible/README.md): playbooks and scripts that create and tear
   down the lab network and VMs on the remote host.
+- [`docs/`](docs): guides for the remote host.
+  - [LIBVIRT-DAEMONS.md](docs/LIBVIRT-DAEMONS.md): checking and enabling the
+    libvirt daemons.
+  - [MANAGING-VMS.md](docs/MANAGING-VMS.md): starting and stopping the VMs.
 
 ## Quick start
 

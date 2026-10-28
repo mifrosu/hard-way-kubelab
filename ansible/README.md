@@ -21,7 +21,7 @@ so no Python libvirt bindings are needed there.
 | `inventory/group_vars/all/vars.yml` | Network, VM and image settings |
 | `inventory/group_vars/all/vault.yml.example` | Template for the encrypted vault file |
 | `templates/` | libvirt network XML and cloud-init user-data |
-| `LIBVIRT-DAEMONS.md` | Checking and enabling the libvirt daemons on the host |
+| [`../docs/`](../docs) | Libvirt daemon setup and day-to-day VM management |
 
 ## Prerequisites
 
@@ -30,7 +30,7 @@ On the control machine: `ansible` and an SSH public key (default
 
 On the remote host:
 - `libvirt` with its daemon sockets enabled, and `virt-install`. See
-  [LIBVIRT-DAEMONS.md](LIBVIRT-DAEMONS.md).
+  [LIBVIRT-DAEMONS.md](../docs/LIBVIRT-DAEMONS.md).
 - SSH access for a user with sudo. The scripts prompt for the sudo password.
 - The host's SSH key in your `~/.ssh/known_hosts`. Connect once by hand
   (`ssh <user>@<host>`) to accept it, because `host_key_checking` is on.
