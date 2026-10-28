@@ -1,0 +1,33 @@
+---
+# Uses only the virsh CLI on the remote host (no python3-libvirt needed).
+- name: Configure libvirt lab network
+  hosts: libvirt_hosts
+  become: true
+  environment:
+    LIBVIRT_DEFAULT_URI: qemu:///system
+  tasks:
+    - name: Check for existing lab network
+      ansible.builtin.command: virsh net-info {{ lab_network.name }}
+      register: net_info
+      changed_when: false
+      failed_when: false
+
+    - name: Define lab network
+      ansible.builtin.command:
+        cmd: virsh net-define /dev/stdin
+        stdin: "{{ lookup('ansible.builtin.template', 'k8s-net.xml.j2') }}"
+      when: net_info.rc != 0
+      register: net_defined
+
+    - name: Refresh lab network state
+      ansible.builtin.command: virsh net-info {{ lab_network.name }}
+      register: net_info
+      changed_when: false
+
+    - name: Start lab network
+      ansible.builtin.command: virsh net-start {{ lab_network.name }}
+      when: net_info.stdout is not search('Active:\s+yes')
+
+    - name: Enable autostart on lab network
+      ansible.builtin.command: virsh net-autostart {{ lab_network.name }}
+      when: net_info.stdout is not search('Autostart:\s+yes')

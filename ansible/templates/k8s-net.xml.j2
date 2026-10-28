@@ -1,0 +1,13 @@
+<network>
+  <name>{{ lab_network.name }}</name>
+  <forward mode='nat'/>
+  <bridge name='{{ lab_network.bridge }}' stp='on' delay='0'/>
+  <ip address='{{ lab_network.gateway }}' netmask='{{ lab_network.netmask }}'>
+    <dhcp>
+      <range start='{{ lab_network.dhcp_start }}' end='{{ lab_network.dhcp_end }}'/>
+{% for vm in lab_vms %}
+      <host mac='{{ vm.mac }}' name='{{ vm.name }}' ip='{{ vm.ip }}'/>
+{% endfor %}
+    </dhcp>
+  </ip>
+</network>
