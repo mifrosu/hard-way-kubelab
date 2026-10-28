@@ -6,24 +6,20 @@
   environment:
     LIBVIRT_DEFAULT_URI: qemu:///system
   tasks:
-    - name: Check for existing lab network
-      ansible.builtin.command: virsh net-info {{ lab_network.name }}
-      register: net_info
+    # Any virsh error (e.g. no libvirt socket) fails here
+    - name: List defined networks
+      ansible.builtin.command: virsh net-list --all --name
+      register: net_names
       changed_when: false
-      # Only "network not found" is acceptable; other errors (e.g. no libvirt socket) must fail
-      failed_when:
-        - net_info.rc != 0
-        - "'Network not found' not in net_info.stderr"
 
     - name: Define lab network
       ansible.builtin.command:
         cmd: virsh net-define /dev/stdin
         stdin: "{{ lookup('ansible.builtin.template', 'k8s-net.xml.j2') }}"
-      when: net_info.rc != 0
+      when: lab_network.name not in net_names.stdout_lines
       changed_when: true
-      register: net_defined
 
-    - name: Refresh lab network state
+    - name: Get lab network state
       ansible.builtin.command: virsh net-info {{ lab_network.name }}
       register: net_info
       changed_when: false

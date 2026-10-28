@@ -38,18 +38,21 @@
         loop_var: vm
         label: "{{ vm.name }}"
 
-    - name: Check for existing VMs
+    # Any virsh error (e.g. no libvirt socket) fails here
+    - name: List defined VMs
+      ansible.builtin.command: virsh list --all --name
+      register: vm_names
+      changed_when: false
+
+    - name: Check state of existing VMs
       ansible.builtin.command: virsh domstate {{ vm.name }}
       register: vm_state
       changed_when: false
-      # Only "domain not found" is acceptable; other errors must fail
-      failed_when:
-        - vm_state.rc != 0
-        - "'Domain not found' not in vm_state.stderr"
       loop: "{{ lab_vms }}"
       loop_control:
         loop_var: vm
         label: "{{ vm.name }}"
+      when: vm.name in vm_names.stdout_lines
 
     - name: Create missing VMs
       ansible.builtin.command:
@@ -65,13 +68,11 @@
           - --cloud-init=user-data={{ lab_cloud_init_dir }}/{{ vm.name }}-user-data
           - --graphics=none
           - --noautoconsole
-      loop: "{{ vm_state.results }}"
+      loop: "{{ lab_vms }}"
       loop_control:
-        loop_var: result
-        label: "{{ result.vm.name }}"
-      vars:
-        vm: "{{ result.vm }}"
-      when: result.rc != 0
+        loop_var: vm
+        label: "{{ vm.name }}"
+      when: vm.name not in vm_names.stdout_lines
       changed_when: true
 
     - name: Start VMs that are shut off
@@ -80,5 +81,5 @@
       loop_control:
         loop_var: result
         label: "{{ result.vm.name }}"
-      when: result.rc == 0 and result.stdout is search('shut off')
+      when: result is not skipped and result.stdout is search('shut off')
       changed_when: true
