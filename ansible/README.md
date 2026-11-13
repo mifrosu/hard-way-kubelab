@@ -14,7 +14,7 @@ so no Python libvirt bindings are needed there.
 | `site.yml` | Define, start and autostart the lab network |
 | `vms.yml` | Download the base image and create the VMs |
 | `teardown-vms.yml` | Stop and delete the VMs (keeps the base image) |
-| `teardown.yml` | Remove the lab network |
+| `teardown-network.yml` | Remove the lab network |
 | `setup-network.sh`, `setup-vms.sh` | Wrappers for `site.yml` and `vms.yml` |
 | `teardown-vms.sh`, `teardown-network.sh` | Wrappers for the teardown playbooks |
 | `inventory/hosts.yml` | One host, `labhost`; its IP comes from the vault |

@@ -103,5 +103,6 @@ reboot, but a reboot is the reliable route.
   to the lab network. The playbooks set `LIBVIRT_DEFAULT_URI=qemu:///system`
   for this reason.
 - **Different error from the playbook:** the network check in `site.yml` and
-  `teardown.yml` only tolerates `Network not found`. Every other `virsh` error
-  stops the run, so the message in the Ansible output is the real cause.
+  `teardown-network.yml` only tolerates `Network not found`. Every other
+  `virsh` error stops the run, so the message in the Ansible output is the real
+  cause.
