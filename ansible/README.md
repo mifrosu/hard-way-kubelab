@@ -13,8 +13,8 @@ so no Python libvirt bindings are needed there.
 |---|---|
 | `site.yml` | Define, start and autostart the lab network |
 | `vms.yml` | Download the base image and create the VMs |
-| `teardown-vms.yml` | Stop and delete the VMs (keeps the base image) |
-| `teardown-network.yml` | Remove the lab network |
+| `teardown-vms.yml` | Stop and undefine the VMs, delete their disks and cloud-init user-data (keeps the base image) |
+| `teardown-network.yml` | Stop and undefine the lab network |
 | `setup-network.sh`, `setup-vms.sh` | Wrappers for `site.yml` and `vms.yml` |
 | `teardown-vms.sh`, `teardown-network.sh` | Wrappers for the teardown playbooks |
 | `inventory/hosts.yml` | One host, `labhost`; its IP comes from the vault |
@@ -26,7 +26,8 @@ so no Python libvirt bindings are needed there.
 ## Prerequisites
 
 On the control machine: `ansible` and an SSH public key (default
-`~/.ssh/id_ed25519.pub`).
+`~/.ssh/id_ed25519.pub`). To run the checks in [Linting](#linting) you also
+need `yamllint`, `ansible-lint` and `shellcheck`.
 
 On the remote host:
 - `libvirt` with its daemon sockets enabled, and `virt-install`. See
@@ -66,6 +67,11 @@ Tear it down (VMs first, then network):
 ./teardown-vms.sh
 ./teardown-network.sh
 ```
+
+`teardown-vms.sh` stops each VM, undefines it, and deletes its disk and
+cloud-init user-data. The downloaded base image is kept, so the next
+`./setup-vms.sh` does not download it again. `teardown-network.sh` does not
+check for VMs still attached to the network, so remove the VMs first.
 
 The scripts run the playbooks with `--ask-become-pass` and pass any extra
 arguments to `ansible-playbook`, for example `./setup-vms.sh --check` or
