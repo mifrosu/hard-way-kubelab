@@ -1,6 +1,12 @@
 ---
-# Creates the lab VMs with virt-install. Requires the lab network (site.yml)
-# and virt-install on the remote host.
+# Creates the lab VMs with virt-install. Requires the lab network (site.yml),
+# plus virt-install and xorriso on the remote host.
+#
+# cloud-init config is delivered as a NoCloud seed ISO (volume label "cidata")
+# built here, rather than with virt-install --cloud-init, which delivered an
+# empty user-data to the guest. The ISO is attached as a read-only virtio disk,
+# not a CD-ROM: on a SATA CD-ROM the device can appear after cloud-init's
+# ds-identify has run, which leaves cloud-init disabled for the boot.
 - name: Create lab VMs
   hosts: libvirt_hosts
   become: true
@@ -12,6 +18,10 @@
   tasks:
     - name: Check that virt-install is available
       ansible.builtin.command: virt-install --version
+      changed_when: false
+
+    - name: Check that xorriso is available
+      ansible.builtin.command: xorriso -version
       changed_when: false
 
     - name: Create cloud-init directory
@@ -33,6 +43,38 @@
         src: user-data.j2
         dest: "{{ lab_cloud_init_dir }}/{{ vm.name }}-user-data"
         mode: "0644"
+      loop: "{{ lab_vms }}"
+      loop_control:
+        loop_var: vm
+        label: "{{ vm.name }}"
+
+    - name: Render cloud-init meta-data
+      ansible.builtin.template:
+        src: meta-data.j2
+        dest: "{{ lab_cloud_init_dir }}/{{ vm.name }}-meta-data"
+        mode: "0644"
+      loop: "{{ lab_vms }}"
+      loop_control:
+        loop_var: vm
+        label: "{{ vm.name }}"
+
+    - name: Build cloud-init seed ISOs
+      ansible.builtin.command:
+        argv:
+          - xorriso
+          - -as
+          - mkisofs
+          - -output
+          - "{{ lab_cloud_init_dir }}/{{ vm.name }}-seed.iso"
+          - -volid
+          - cidata
+          - -joliet
+          - -rock
+          - -graft-points
+          - user-data={{ lab_cloud_init_dir }}/{{ vm.name }}-user-data
+          - meta-data={{ lab_cloud_init_dir }}/{{ vm.name }}-meta-data
+      args:
+        creates: "{{ lab_cloud_init_dir }}/{{ vm.name }}-seed.iso"
       loop: "{{ lab_vms }}"
       loop_control:
         loop_var: vm
@@ -65,7 +107,8 @@
           - --import
           - --disk=path={{ lab_image_dir }}/{{ vm.name }}.qcow2,format=qcow2,size={{ vm.disk_gb }},backing_store={{ lab_base_image }}
           - --network=network={{ lab_network.name }},mac={{ vm.mac }}
-          - --cloud-init=user-data={{ lab_cloud_init_dir }}/{{ vm.name }}-user-data
+          - --disk=path={{ lab_cloud_init_dir }}/{{ vm.name }}-seed.iso,format=raw,bus=virtio,readonly=on
+          - --boot=hd
           - --graphics=none
           - --noautoconsole
       loop: "{{ lab_vms }}"

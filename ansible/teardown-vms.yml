@@ -1,6 +1,6 @@
 ---
 # Removes the lab VMs created by vms.yml: stops and undefines each VM and
-# deletes its disk and cloud-init user-data. The downloaded base image is kept.
+# deletes its disk and cloud-init seed files. The downloaded base image is kept.
 - name: Remove lab VMs
   hosts: libvirt_hosts
   become: true
@@ -43,11 +43,10 @@
       when: result is not skipped
       changed_when: true
 
-    - name: Remove cloud-init user-data
+    - name: Remove cloud-init seed files
       ansible.builtin.file:
-        path: "{{ lab_cloud_init_dir }}/{{ vm.name }}-user-data"
+        path: "{{ lab_cloud_init_dir }}/{{ item.0.name }}-{{ item.1 }}"
         state: absent
-      loop: "{{ lab_vms }}"
+      loop: "{{ lab_vms | product(['user-data', 'meta-data', 'seed.iso']) | list }}"
       loop_control:
-        loop_var: vm
-        label: "{{ vm.name }}"
+        label: "{{ item.0.name }}-{{ item.1 }}"

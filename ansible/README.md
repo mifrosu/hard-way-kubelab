@@ -30,7 +30,8 @@ On the control machine: `ansible` and an SSH public key (default
 need `yamllint`, `ansible-lint` and `shellcheck`.
 
 On the remote host:
-- `libvirt` with its daemon sockets enabled, and `virt-install`. See
+- `libvirt` with its daemon sockets enabled, plus `virt-install` and `xorriso`
+  (builds the cloud-init seed ISOs). See
   [LIBVIRT-DAEMONS.md](../docs/LIBVIRT-DAEMONS.md).
 - SSH access for a user with sudo. The scripts prompt for the sudo password.
 - The host's SSH key in your `~/.ssh/known_hosts`. Connect once by hand
@@ -69,7 +70,7 @@ Tear it down (VMs first, then network):
 ```
 
 `teardown-vms.sh` stops each VM, undefines it, and deletes its disk and
-cloud-init user-data. The downloaded base image is kept, so the next
+cloud-init seed files. The downloaded base image is kept, so the next
 `./setup-vms.sh` does not download it again. `teardown-network.sh` does not
 check for VMs still attached to the network, so remove the VMs first.
 
