@@ -7,6 +7,10 @@
 # empty user-data to the guest. The ISO is attached as a read-only virtio disk,
 # not a CD-ROM: on a SATA CD-ROM the device can appear after cloud-init's
 # ds-identify has run, which leaves cloud-init disabled for the boot.
+#
+# The seed disk stays attached to each VM, so a VM cannot start while its
+# seed ISO is missing. Running this playbook rebuilds missing ISOs before it
+# starts any VM.
 - name: Create lab VMs
   hosts: libvirt_hosts
   become: true
@@ -58,23 +62,27 @@
         loop_var: vm
         label: "{{ vm.name }}"
 
+    # Rebuilt whenever the ISO is missing or older than its user-data or
+    # meta-data, so config changes reach VMs created later. The ISO is written
+    # to a temporary file and renamed into place, so an interrupted build
+    # never leaves a partial ISO at the final path. Rebuilding does not
+    # reconfigure existing VMs: cloud-init only runs once per instance-id.
     - name: Build cloud-init seed ISOs
-      ansible.builtin.command:
-        argv:
-          - xorriso
-          - -as
-          - mkisofs
-          - -output
-          - "{{ lab_cloud_init_dir }}/{{ vm.name }}-seed.iso"
-          - -volid
-          - cidata
-          - -joliet
-          - -rock
-          - -graft-points
-          - user-data={{ lab_cloud_init_dir }}/{{ vm.name }}-user-data
-          - meta-data={{ lab_cloud_init_dir }}/{{ vm.name }}-meta-data
-      args:
-        creates: "{{ lab_cloud_init_dir }}/{{ vm.name }}-seed.iso"
+      ansible.builtin.shell: |
+        set -eu
+        iso={{ (lab_cloud_init_dir ~ '/' ~ vm.name ~ '-seed.iso') | quote }}
+        ud={{ (lab_cloud_init_dir ~ '/' ~ vm.name ~ '-user-data') | quote }}
+        md={{ (lab_cloud_init_dir ~ '/' ~ vm.name ~ '-meta-data') | quote }}
+        if [ "$iso" -nt "$ud" ] && [ "$iso" -nt "$md" ]; then
+          echo up-to-date
+          exit 0
+        fi
+        rm -f "$iso.tmp"
+        xorriso -as mkisofs -output "$iso.tmp" -volid cidata -joliet -rock \
+          -graft-points "user-data=$ud" "meta-data=$md"
+        mv -f "$iso.tmp" "$iso"
+      register: seed_iso
+      changed_when: seed_iso.stdout != 'up-to-date'
       loop: "{{ lab_vms }}"
       loop_control:
         loop_var: vm

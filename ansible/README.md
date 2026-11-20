@@ -74,6 +74,14 @@ cloud-init seed files. The downloaded base image is kept, so the next
 `./setup-vms.sh` does not download it again. `teardown-network.sh` does not
 check for VMs still attached to the network, so remove the VMs first.
 
+Each VM keeps its cloud-init seed ISO
+(`/var/lib/libvirt/images/cloud-init/<vm>-seed.iso`) attached as a read-only
+disk, so don't delete those files while the VMs exist: a VM won't start
+without its ISO. If they do go missing, `./setup-vms.sh` rebuilds them before
+starting any VM. Changing the SSH key or cloud-init template only affects VMs
+created afterwards, because cloud-init runs once per VM; recreate a VM to
+apply new settings.
+
 The scripts run the playbooks with `--ask-become-pass` and pass any extra
 arguments to `ansible-playbook`, for example `./setup-vms.sh --check` or
 `./setup-vms.sh -v`.
