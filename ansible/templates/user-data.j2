@@ -1,6 +1,24 @@
 #cloud-config
 hostname: {{ vm.name }}
-manage_etc_hosts: true
+fqdn: {{ vm.name }}.{{ lab_domain }}
+# /etc/hosts is written once below, on first boot, and is not regenerated on
+# later boots, so later edits made inside the VM are kept.
+manage_etc_hosts: false
+write_files:
+  - path: /etc/hosts
+    owner: root:root
+    permissions: "0644"
+    content: |
+      127.0.0.1 localhost
+      127.0.1.1 {{ vm.name }}.{{ lab_domain }} {{ vm.name }}
+      ::1 localhost ip6-localhost ip6-loopback
+      ff02::1 ip6-allnodes
+      ff02::2 ip6-allrouters
+
+      # Lab machines: IP FQDN HOSTNAME
+{% for host in lab_vms %}
+      {{ host.ip }} {{ host.name }}.{{ lab_domain }} {{ host.name }}
+{% endfor %}
 disable_root: false
 ssh_pwauth: false
 ssh_authorized_keys:

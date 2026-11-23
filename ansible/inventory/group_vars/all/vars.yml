@@ -8,6 +8,9 @@ lab_network:
   dhcp_start: 10.100.0.100
   dhcp_end: 10.100.0.200
 
+# DNS domain for the lab VMs: each VM's FQDN is <name>.<lab_domain>
+lab_domain: kubernetes.local
+
 # Lab VMs: static DHCP reservations on the lab network, plus sizing
 lab_vms:
   - name: server
