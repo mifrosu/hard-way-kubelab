@@ -1,0 +1,146 @@
+---
+# Provisions the lab's certificate authority and TLS certificates, following
+# "Provisioning a CA and Generating TLS Certificates" in Kubernetes the Hard
+# Way (docs/04-certificate-authority.md). The control machine plays the
+# guide's jumpbox: everything is generated there with the openssl CLI, from
+# files/ca.conf, into lab_pki_dir. The files are then copied to the VMs.
+#
+# Files that already exist are not regenerated, so running this again only
+# re-copies them. Delete lab_pki_dir to start a new CA.
+
+- name: Generate CA and certificates on the control machine
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [generate]
+  vars:
+    lab_ca_conf: "{{ playbook_dir }}/files/ca.conf"
+    # One per section in ca.conf, as listed in the guide
+    lab_certs:
+      - admin
+      - node-0
+      - node-1
+      - kube-proxy
+      - kube-scheduler
+      - kube-controller-manager
+      - kube-api-server
+      - service-accounts
+  tasks:
+    # -noenc and -copy_extensions need OpenSSL 3.0 or later
+    - name: Check OpenSSL version
+      ansible.builtin.command: openssl version
+      register: openssl_version
+      changed_when: false
+      failed_when: >-
+        openssl_version.rc != 0 or
+        (openssl_version.stdout.split()[1] | regex_replace('[^0-9.].*$', '')) is version('3.0', '<')
+
+    - name: Create PKI directory
+      ansible.builtin.file:
+        path: "{{ lab_pki_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Generate CA private key
+      ansible.builtin.command:
+        cmd: openssl genrsa -out ca.key 4096
+        chdir: "{{ lab_pki_dir }}"
+        creates: ca.key
+
+    - name: Generate CA certificate
+      ansible.builtin.command:
+        argv: [openssl, req, -x509, -new, -sha512, -noenc, -key, ca.key, -days, "3653", -config, "{{ lab_ca_conf }}", -out, ca.crt]
+        chdir: "{{ lab_pki_dir }}"
+        creates: ca.crt
+
+    - name: Generate private keys
+      ansible.builtin.command:
+        cmd: openssl genrsa -out {{ item }}.key 4096
+        chdir: "{{ lab_pki_dir }}"
+        creates: "{{ item }}.key"
+      loop: "{{ lab_certs }}"
+
+    - name: Generate certificate signing requests
+      ansible.builtin.command:
+        argv: [openssl, req, -new, -key, "{{ item }}.key", -sha256, -config, "{{ lab_ca_conf }}", -section, "{{ item }}", -out, "{{ item }}.csr"]
+        chdir: "{{ lab_pki_dir }}"
+        creates: "{{ item }}.csr"
+      loop: "{{ lab_certs }}"
+
+    - name: Sign certificates with the CA
+      ansible.builtin.command:
+        argv:
+          - openssl
+          - x509
+          - -req
+          - -days
+          - "3653"
+          - -in
+          - "{{ item }}.csr"
+          - -copy_extensions
+          - copyall
+          - -sha256
+          - -CA
+          - ca.crt
+          - -CAkey
+          - ca.key
+          - -CAcreateserial
+          - -out
+          - "{{ item }}.crt"
+        chdir: "{{ lab_pki_dir }}"
+        creates: "{{ item }}.crt"
+      loop: "{{ lab_certs }}"
+
+    - name: Restrict private key permissions
+      ansible.builtin.file:
+        path: "{{ lab_pki_dir }}/{{ item }}.key"
+        mode: "0600"
+      loop: "{{ ['ca'] + lab_certs }}"
+
+# Guide: "Distribute the Client and Server Certificates"
+- name: Copy kubelet certificates to the nodes
+  hosts: lab_nodes
+  gather_facts: false
+  tags: [distribute]
+  tasks:
+    - name: Create kubelet directory
+      ansible.builtin.file:
+        path: /var/lib/kubelet
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Copy CA certificate and kubelet key pair
+      ansible.builtin.copy:
+        src: "{{ lab_pki_dir }}/{{ item.src }}"
+        dest: /var/lib/kubelet/{{ item.dest }}
+        owner: root
+        group: root
+        mode: "{{ item.mode }}"
+      loop:
+        - { src: ca.crt, dest: ca.crt, mode: "0644" }
+        - { src: "{{ inventory_hostname }}.crt", dest: kubelet.crt, mode: "0644" }
+        - { src: "{{ inventory_hostname }}.key", dest: kubelet.key, mode: "0600" }
+      loop_control:
+        label: "{{ item.dest }}"
+
+- name: Copy CA and API server certificates to the server
+  hosts: lab_servers
+  gather_facts: false
+  tags: [distribute]
+  tasks:
+    - name: Copy key pairs to root's home directory
+      ansible.builtin.copy:
+        src: "{{ lab_pki_dir }}/{{ item }}"
+        dest: /root/{{ item }}
+        owner: root
+        group: root
+        mode: "{{ '0600' if item is search('\\.key$') else '0644' }}"
+      loop:
+        - ca.key
+        - ca.crt
+        - kube-api-server.key
+        - kube-api-server.crt
+        - service-accounts.key
+        - service-accounts.crt

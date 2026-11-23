@@ -17,7 +17,8 @@ A NAT network (`k8s`, `10.100.0.0/24`) with three Debian VMs:
 ## Contents
 
 - [`ansible/`](ansible/README.md): playbooks and scripts that create and tear
-  down the lab network and VMs on the remote host.
+  down the lab network and VMs on the remote host, and provision the CA and
+  TLS certificates.
 - [`docs/`](docs): guides for the remote host.
   - [LIBVIRT-DAEMONS.md](docs/LIBVIRT-DAEMONS.md): checking and enabling the
     libvirt daemons.
@@ -29,6 +30,7 @@ A NAT network (`k8s`, `10.100.0.0/24`) with three Debian VMs:
 cd ansible
 ./setup-network.sh
 ./setup-vms.sh
+./setup-pki.sh
 ```
 
 See the [ansible README](ansible/README.md) for prerequisites, vault setup and

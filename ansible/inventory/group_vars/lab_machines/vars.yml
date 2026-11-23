@@ -1,0 +1,22 @@
+---
+# Connection settings for the lab VMs. They sit on the NAT network on the
+# libvirt host, so SSH reaches them through labhost with ProxyJump. The jump
+# connection still uses your normal ~/.ssh/known_hosts with strict checking:
+# options given with -o apply only to the destination, not the jump host.
+
+# IP from the matching entry in lab_vms
+ansible_host: "{{ (lab_vms | selectattr('name', 'equalto', inventory_hostname) | first).ip }}"
+# cloud-init authorises lab_ssh_public_key_file for root
+ansible_user: root
+
+# VM host keys are trusted on first use and kept in a separate file, which
+# teardown-vms.yml clears so recreated VMs (with new host keys) are accepted.
+lab_known_hosts_file: "{{ inventory_dir }}/../.lab_known_hosts"
+
+lab_jump_host: >-
+  {{ (hostvars['labhost'].ansible_user ~ '@') if hostvars['labhost'].ansible_user is defined else '' }}{{ hostvars['labhost'].ansible_host }}
+
+ansible_ssh_common_args: >-
+  -o ProxyJump={{ lab_jump_host }}
+  -o UserKnownHostsFile={{ lab_known_hosts_file }}
+  -o StrictHostKeyChecking=accept-new

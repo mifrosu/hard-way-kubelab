@@ -1,2 +1,4 @@
 .vault_pass
 inventory/group_vars/all/vault.yml.decrypted
+pki/
+.lab_known_hosts

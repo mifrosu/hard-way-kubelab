@@ -39,3 +39,7 @@ lab_image_dir: /var/lib/libvirt/images
 lab_os_variant: debian12
 # Public key, read on the CONTROL machine, authorised for root and the default user
 lab_ssh_public_key_file: ~/.ssh/id_ed25519.pub
+
+# Directory on the CONTROL machine where pki.yml generates the CA, keys and
+# certificates (gitignored)
+lab_pki_dir: "{{ inventory_dir }}/../pki"

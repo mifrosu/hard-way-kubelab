@@ -50,3 +50,18 @@
       loop: "{{ lab_vms | product(['user-data', 'meta-data', 'seed.iso']) | list }}"
       loop_control:
         label: "{{ item.0.name }}-{{ item.1 }}"
+
+# Recreated VMs get new SSH host keys, so forget the old ones
+- name: Forget lab VM host keys
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Remove VM host keys from the lab known_hosts file
+      ansible.builtin.known_hosts:
+        path: "{{ hostvars[item.name].lab_known_hosts_file }}"
+        name: "{{ item.ip }}"
+        state: absent
+      loop: "{{ lab_vms }}"
+      loop_control:
+        label: "{{ item.name }}"
