@@ -11,7 +11,7 @@ ansible_user: root
 
 # VM host keys are trusted on first use and kept in a separate file, which
 # teardown-vms.yml clears so recreated VMs (with new host keys) are accepted.
-lab_known_hosts_file: "{{ inventory_dir }}/../.lab_known_hosts"
+lab_known_hosts_file: "{{ playbook_dir }}/.lab_known_hosts"
 
 lab_jump_host: >-
   {{ (hostvars['labhost'].ansible_user ~ '@') if hostvars['labhost'].ansible_user is defined else '' }}{{ hostvars['labhost'].ansible_host }}

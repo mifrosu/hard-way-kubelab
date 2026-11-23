@@ -41,32 +41,58 @@
         state: directory
         mode: "0700"
 
+    # Absolute paths, not chdir: in check mode the PKI directory may not exist
+    # yet, and "creates" lets the command module report what would run
+    # without running it.
     - name: Generate CA private key
       ansible.builtin.command:
-        cmd: openssl genrsa -out ca.key 4096
-        chdir: "{{ lab_pki_dir }}"
-        creates: ca.key
+        argv: [openssl, genrsa, -out, "{{ lab_pki_dir }}/ca.key", "4096"]
+        creates: "{{ lab_pki_dir }}/ca.key"
 
     - name: Generate CA certificate
       ansible.builtin.command:
-        argv: [openssl, req, -x509, -new, -sha512, -noenc, -key, ca.key, -days, "3653", -config, "{{ lab_ca_conf }}", -out, ca.crt]
-        chdir: "{{ lab_pki_dir }}"
-        creates: ca.crt
+        argv:
+          - openssl
+          - req
+          - -x509
+          - -new
+          - -sha512
+          - -noenc
+          - -key
+          - "{{ lab_pki_dir }}/ca.key"
+          - -days
+          - "3653"
+          - -config
+          - "{{ lab_ca_conf }}"
+          - -out
+          - "{{ lab_pki_dir }}/ca.crt"
+        creates: "{{ lab_pki_dir }}/ca.crt"
 
     - name: Generate private keys
       ansible.builtin.command:
-        cmd: openssl genrsa -out {{ item }}.key 4096
-        chdir: "{{ lab_pki_dir }}"
-        creates: "{{ item }}.key"
+        argv: [openssl, genrsa, -out, "{{ lab_pki_dir }}/{{ item }}.key", "4096"]
+        creates: "{{ lab_pki_dir }}/{{ item }}.key"
       loop: "{{ lab_certs }}"
 
     - name: Generate certificate signing requests
       ansible.builtin.command:
-        argv: [openssl, req, -new, -key, "{{ item }}.key", -sha256, -config, "{{ lab_ca_conf }}", -section, "{{ item }}", -out, "{{ item }}.csr"]
-        chdir: "{{ lab_pki_dir }}"
-        creates: "{{ item }}.csr"
+        argv:
+          - openssl
+          - req
+          - -new
+          - -key
+          - "{{ lab_pki_dir }}/{{ item }}.key"
+          - -sha256
+          - -config
+          - "{{ lab_ca_conf }}"
+          - -section
+          - "{{ item }}"
+          - -out
+          - "{{ lab_pki_dir }}/{{ item }}.csr"
+        creates: "{{ lab_pki_dir }}/{{ item }}.csr"
       loop: "{{ lab_certs }}"
 
+    # ca.srl is written next to ca.crt
     - name: Sign certificates with the CA
       ansible.builtin.command:
         argv:
@@ -76,26 +102,27 @@
           - -days
           - "3653"
           - -in
-          - "{{ item }}.csr"
+          - "{{ lab_pki_dir }}/{{ item }}.csr"
           - -copy_extensions
           - copyall
           - -sha256
           - -CA
-          - ca.crt
+          - "{{ lab_pki_dir }}/ca.crt"
           - -CAkey
-          - ca.key
+          - "{{ lab_pki_dir }}/ca.key"
           - -CAcreateserial
           - -out
-          - "{{ item }}.crt"
-        chdir: "{{ lab_pki_dir }}"
-        creates: "{{ item }}.crt"
+          - "{{ lab_pki_dir }}/{{ item }}.crt"
+        creates: "{{ lab_pki_dir }}/{{ item }}.crt"
       loop: "{{ lab_certs }}"
 
+    # The key files don't exist yet in check mode on a first run
     - name: Restrict private key permissions
       ansible.builtin.file:
         path: "{{ lab_pki_dir }}/{{ item }}.key"
         mode: "0600"
       loop: "{{ ['ca'] + lab_certs }}"
+      when: not ansible_check_mode or (lab_pki_dir ~ '/' ~ item ~ '.key') is file
 
 # Guide: "Distribute the Client and Server Certificates"
 - name: Copy kubelet certificates to the nodes
@@ -124,6 +151,8 @@
         - { src: "{{ inventory_hostname }}.key", dest: kubelet.key, mode: "0600" }
       loop_control:
         label: "{{ item.dest }}"
+      # The files don't exist yet in check mode on a first run
+      when: not ansible_check_mode or (lab_pki_dir ~ '/' ~ item.src) is file
 
 - name: Copy CA and API server certificates to the server
   hosts: lab_servers
@@ -144,3 +173,4 @@
         - kube-api-server.crt
         - service-accounts.key
         - service-accounts.crt
+      when: not ansible_check_mode or (lab_pki_dir ~ '/' ~ item) is file
